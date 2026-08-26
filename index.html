@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.2">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sistema de Gestão e Checklist de Coletores</title>
   <style>
     :root {
@@ -457,10 +457,10 @@
   </div>
 </div>
 
-<!-- INICIALIZAÇÃO FIREBASE -->
+<!-- INTEGRAÇÃO COM FIREBASE EMBUTIDA -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+  import { getDatabase, ref, set, onValue, push, remove, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyBM_WqhDckDzgtxPl1qi7oKU8QiMqHbJIQ",
@@ -474,11 +474,9 @@
   };
 
   const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-</script>
+  const db = getDatabase(app);
 
-<!-- LÓGICA DA APLICAÇÃO -->
-<script>
+  // Valores padrão para popular caso o banco esteja vazio
   const defaultColetores = ["COL-01", "COL-02", "COL-03", "COL-04", "COL-05"];
   const defaultItems = [
     "Bateria 100% carregada",
@@ -490,47 +488,61 @@
   ];
   const defaultAdms = [{ user: "Giovanni", pass: "240223" }];
 
-  const defaultRegistros = [
-    {
-      id: 1,
-      dataISO: "2026-08-26",
-      dataBR: "26/08/2026",
-      hora: "08:30",
-      coletor: "COL-01",
-      responsavel: "ALISSON",
-      completo: true,
-      devolvido: true,
-      horaDevolucao: "17:15",
-      obsDevolucao: "Devolvido em perfeito estado.",
-      statusDevolucao: "OK",
-      itens: defaultItems.map(item => ({ item, status: true }))
-    },
-    {
-      id: 2,
-      dataISO: "2026-08-26",
-      dataBR: "26/08/2026",
-      hora: "09:15",
-      coletor: "COL-03",
-      responsavel: "MARCOS",
-      completo: true,
-      devolvido: false,
-      horaDevolucao: null,
-      obsDevolucao: null,
-      statusDevolucao: null,
-      itens: defaultItems.map(item => ({ item, status: true }))
-    }
-  ];
-
-  let coletores = JSON.parse(localStorage.getItem('adm_coletores')) || defaultColetores;
-  let itemsChecklist = JSON.parse(localStorage.getItem('adm_items')) || defaultItems;
-  let adms = JSON.parse(localStorage.getItem('adm_users')) || defaultAdms;
-  let registros = JSON.parse(localStorage.getItem('adm_registros')) || defaultRegistros;
+  let coletores = [];
+  let itemsChecklist = [];
+  let adms = [];
+  let registros = [];
 
   const coletorSelect = document.getElementById('coletorSelect');
   const responsavelInput = document.getElementById('responsavelInput');
   const checklistContainer = document.getElementById('checklistContainer');
   const progressBar = document.getElementById('progressBar');
   const filterDateInput = document.getElementById('filterDate');
+
+  // Sincronização em tempo real (Escutando o Firebase)
+  onValue(ref(db, 'coletores'), (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      coletores = Array.isArray(data) ? data : Object.values(data);
+    } else {
+      coletores = defaultColetores;
+      set(ref(db, 'coletores'), defaultColetores);
+    }
+    renderApp();
+  });
+
+  onValue(ref(db, 'itemsChecklist'), (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      itemsChecklist = Array.isArray(data) ? data : Object.values(data);
+    } else {
+      itemsChecklist = defaultItems;
+      set(ref(db, 'itemsChecklist'), defaultItems);
+    }
+    renderApp();
+  });
+
+  onValue(ref(db, 'adms'), (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      adms = Array.isArray(data) ? data : Object.values(data);
+    } else {
+      adms = defaultAdms;
+      set(ref(db, 'adms'), defaultAdms);
+    }
+  });
+
+  onValue(ref(db, 'registros'), (snapshot) => {
+    const data = snapshot.val();
+    registros = [];
+    if (data) {
+      Object.keys(data).forEach(key => {
+        registros.push({ fbId: key, ...data[key] });
+      });
+      registros.sort((a, b) => b.id - a.id);
+    }
+    renderRegistros();
+  });
 
   function switchTab(tabId) {
     document.getElementById('tabChecklist').classList.remove('active');
@@ -625,10 +637,9 @@
       statusDevolucao: null
     };
 
-    registros.unshift(novoRegistro);
-    localStorage.setItem('adm_registros', JSON.stringify(registros));
+    push(ref(db, 'registros'), novoRegistro);
 
-    alert(`Retirada salva com sucesso!\n${dataBR} às ${hora} - ${coletor} com "${responsavel}"`);
+    alert(`Retirada salva com sucesso no banco de dados!\n${dataBR} às ${hora} - ${coletor} com "${responsavel}"`);
 
     coletorSelect.value = '';
     responsavelInput.value = '';
@@ -675,12 +686,14 @@
         }
 
         let itensHtml = '';
-        rec.itens.forEach(it => {
-          const st = it.status 
-            ? `<span style="color: var(--success); font-weight:bold;">OK</span>`
-            : `<span style="color: var(--danger); font-weight:bold;">PENDENTE</span>`;
-          itensHtml += `<li><span>${it.item}</span> ${st}</li>`;
-        });
+        if (rec.itens) {
+          rec.itens.forEach(it => {
+            const st = it.status 
+              ? `<span style="color: var(--success); font-weight:bold;">OK</span>`
+              : `<span style="color: var(--danger); font-weight:bold;">PENDENTE</span>`;
+            itensHtml += `<li><span>${it.item}</span> ${st}</li>`;
+          });
+        }
 
         let devSection = '';
         if (rec.devolvido) {
@@ -695,7 +708,7 @@
         } else {
           devSection = `
             <div style="margin-top: 12px; text-align: center;">
-              <button class="btn btn-success" style="width: 100%;" onclick="event.stopPropagation(); registrarDevolucao(${rec.id})">Confirmar Devolução</button>
+              <button class="btn btn-success" style="width: 100%;" onclick="event.stopPropagation(); registrarDevolucao('${rec.fbId}')">Confirmar Devolução</button>
             </div>
           `;
         }
@@ -714,7 +727,7 @@
               </ul>
               ${devSection}
               <div style="text-align:right; margin-top: 12px;">
-                <button class="btn-sm-danger" onclick="event.stopPropagation(); removeRecord(${rec.id})">Excluir Registro</button>
+                <button class="btn-sm-danger" onclick="event.stopPropagation(); removeRecord('${rec.fbId}')">Excluir Registro</button>
               </div>
             </div>
           </div>
@@ -727,8 +740,8 @@
     });
   }
 
-  window.registrarDevolucao = function(id) {
-    const rec = registros.find(r => r.id === id);
+  window.registrarDevolucao = function(fbId) {
+    const rec = registros.find(r => r.fbId === fbId);
     if (!rec) return;
 
     const mesmoEstado = confirm(`Confirmar devolução do ${rec.coletor} (${rec.responsavel})?\n\nClique em OK se voltou NAS MESMAS CONDIÇÕES do checklist inicial.\nClique em CANCELAR se houve alguma avaria/problema.`);
@@ -736,19 +749,20 @@
     const agora = new Date();
     const horaDev = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    rec.devolvido = true;
-    rec.horaDevolucao = horaDev;
+    let statusDevolucao = 'OK';
+    let obsDevolucao = 'Entregue nas mesmas condições.';
 
-    if (mesmoEstado) {
-      rec.statusDevolucao = 'OK';
-      rec.obsDevolucao = 'Entregue nas mesmas condições.';
-    } else {
-      rec.statusDevolucao = 'AVARIA';
-      rec.obsDevolucao = prompt('Descreva o estado/problema na devolução:', 'Ex: Tela trincada / Bateria fraca');
+    if (!mesmoEstado) {
+      statusDevolucao = 'AVARIA';
+      obsDevolucao = prompt('Descreva o estado/problema na devolução:', 'Ex: Tela trincada / Bateria fraca');
     }
 
-    localStorage.setItem('adm_registros', JSON.stringify(registros));
-    renderRegistros();
+    update(ref(db, `registros/${fbId}`), {
+      devolvido: true,
+      horaDevolucao: horaDev,
+      statusDevolucao: statusDevolucao,
+      obsDevolucao: obsDevolucao
+    });
   };
 
   window.toggleRecordCard = function(card) {
@@ -763,11 +777,9 @@
   filterDateInput.addEventListener('change', renderRegistros);
   document.getElementById('btnClearFilter').addEventListener('click', clearDateFilter);
 
-  window.removeRecord = function(id) {
-    if (confirm('Deseja excluir este registro?')) {
-      registros = registros.filter(r => r.id !== id);
-      localStorage.setItem('adm_registros', JSON.stringify(registros));
-      renderRegistros();
+  window.removeRecord = function(fbId) {
+    if (confirm('Deseja excluir este registro permanentemente para todas as máquinas?')) {
+      remove(ref(db, `registros/${fbId}`));
     }
   };
 
@@ -863,10 +875,9 @@
     const p = document.getElementById('newAdmPass').value.trim();
     if (u && p) {
       adms.push({ user: u, pass: p });
-      localStorage.setItem('adm_users', JSON.stringify(adms));
+      set(ref(db, 'adms'), adms);
       document.getElementById('newAdmUser').value = '';
       document.getElementById('newAdmPass').value = '';
-      renderAdmLists();
     }
   });
 
@@ -874,10 +885,8 @@
     const val = document.getElementById('newColetorInput').value.trim();
     if (val) {
       coletores.push(val);
-      localStorage.setItem('adm_coletores', JSON.stringify(coletores));
+      set(ref(db, 'coletores'), coletores);
       document.getElementById('newColetorInput').value = '';
-      renderAdmLists();
-      renderApp();
     }
   });
 
@@ -885,16 +894,14 @@
     const val = document.getElementById('newItemInput').value.trim();
     if (val) {
       itemsChecklist.push(val);
-      localStorage.setItem('adm_items', JSON.stringify(itemsChecklist));
+      set(ref(db, 'itemsChecklist'), itemsChecklist);
       document.getElementById('newItemInput').value = '';
-      renderAdmLists();
-      renderApp();
     }
   });
 
-  window.removeAdm = function(i) { adms.splice(i, 1); localStorage.setItem('adm_users', JSON.stringify(adms)); renderAdmLists(); };
-  window.removeColetor = function(i) { coletores.splice(i, 1); localStorage.setItem('adm_coletores', JSON.stringify(coletores)); renderAdmLists(); renderApp(); };
-  window.removeItem = function(i) { itemsChecklist.splice(i, 1); localStorage.setItem('adm_items', JSON.stringify(itemsChecklist)); renderAdmLists(); renderApp(); };
+  window.removeAdm = function(i) { adms.splice(i, 1); set(ref(db, 'adms'), adms); };
+  window.removeColetor = function(i) { coletores.splice(i, 1); set(ref(db, 'coletores'), coletores); };
+  window.removeItem = function(i) { itemsChecklist.splice(i, 1); set(ref(db, 'itemsChecklist'), itemsChecklist); };
 
   function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
@@ -904,9 +911,6 @@
     document.querySelectorAll('.chk-item').forEach(chk => chk.checked = false);
     updateProgress();
   });
-
-  renderApp();
-  renderRegistros();
 </script>
 
 </body>
