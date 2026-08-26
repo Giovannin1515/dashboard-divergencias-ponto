@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Gestão e Checklist de Coletores</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #cbd5e1;
+      --success: #16a34a;
+      --success-bg: #dcfce7;
+      --warning: #d97706;
+      --warning-bg: #fef3c7;
+      --danger: #dc2626;
+      --danger-bg: #fee2e2;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .topbar {
+      background: #1e293b;
+      color: #fff;
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .topbar h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 12px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: 1px solid #475569;
+      color: #cbd5e1;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active, .tab-btn:hover {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .btn-adm {
+      background: #334155;
+      color: #fff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .main-container {
+      max-width: 1200px;
+      width: 100%;
+      margin: 24px auto;
+      padding: 0 16px;
+      flex: 1;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block !important;
+    }
+
+    .grid-checklist {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 16px;
+      color: var(--text);
+      border-bottom: 2px solid var(--bg);
+      padding-bottom: 8px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    select, input[type="text"], input[type="password"], input[type="date"] {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.95rem;
+      outline: none;
+    }
+
+    select:focus, input:focus {
+      border-color: var(--primary);
+    }
+
+    .checklist-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .check-item input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+    }
+
+    .progress-bar-container {
+      background: var(--bg);
+      height: 10px;
+      border-radius: 5px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--primary);
+      transition: width 0.3s ease;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    button.btn {
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn-reset { background: #e2e8f0; color: var(--text); }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-success { background: var(--success); color: #fff; }
+
+    /* Registros */
+    .filter-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #fff;
+      padding: 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+
+    .record-day-group {
+      margin-bottom: 24px;
+    }
+
+    .day-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+      padding-left: 8px;
+      border-left: 4px solid var(--primary);
+    }
+
+    .records-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 16px;
+    }
+
+    .record-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .record-card:hover {
+      border-color: var(--primary);
+    }
+
+    .record-header {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .badge-ok { background: var(--success-bg); color: var(--success); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
+    .badge-warn { background: var(--warning-bg); color: var(--warning); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
+    .badge-danger { background: var(--danger-bg); color: var(--danger); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
+
+    .record-body {
+      display: none;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--bg);
+    }
+
+    .record-card.expanded .record-body {
+      display: block;
+    }
+
+    .item-status-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.85rem;
+      margin-bottom: 12px;
+    }
+
+    .item-status-list li {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .dev-box {
+      background: var(--bg);
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      margin-top: 8px;
+    }
+
+    /* Modais */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+      background: #fff;
+      border-radius: var(--radius);
+      padding: 24px;
+      width: 100%;
+      max-width: 440px;
+      max-height: 90vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .admin-section { border-top: 1px solid var(--border); padding-top: 12px; }
+    .admin-section h3 { font-size: 0.9rem; margin-bottom: 8px; color: var(--text-muted); }
+
+    .inline-form { display: flex; gap: 8px; }
+    .admin-list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 0.85rem;
+    }
+
+    .btn-sm-danger { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Gestão de Coletores</h1>
+  <div class="nav-tabs">
+    <button class="tab-btn active" id="btnTabChecklist">Checklist Diário</button>
+    <button class="tab-btn" id="btnTabRegistros">Histórico de Registros</button>
+  </div>
+  <button class="btn-adm" id="openLoginBtn">ADM</button>
+</div>
+
+<div class="main-container">
+
+  <!-- ABA 1: CHECKLIST -->
+  <div id="tabChecklist" class="tab-content active">
+    <div class="grid-checklist">
+      <div class="card">
+        <h2>Identificação</h2>
+        <div class="form-group">
+          <label for="coletorSelect">Número do Coletor</label>
+          <select id="coletorSelect"></select>
+        </div>
+        <div class="form-group">
+          <label for="responsavelInput">Nome do Responsável</label>
+          <input type="text" id="responsavelInput" placeholder="Ex: ALISSON">
+        </div>
+        <div style="margin-top: 12px;">
+          <label>Progresso</label>
+          <div class="progress-bar-container">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Itens de Verificação</h2>
+        <div class="checklist-grid" id="checklistContainer"></div>
+        <div class="actions">
+          <button class="btn btn-reset" id="btnReset">Limpar Formulário</button>
+          <button class="btn btn-success" id="btnSaveRecord">Salvar e Registrar Retirada</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABA 2: HISTÓRICO DE REGISTROS -->
+  <div id="tabRegistros" class="tab-content">
+    <div class="filter-bar">
+      <div style="display:flex; gap: 12px; align-items:center;">
+        <label for="filterDate">Filtrar por Data:</label>
+        <input type="date" id="filterDate">
+        <button class="btn btn-reset" id="btnClearFilter">Mostrar Todos</button>
+      </div>
+      <div>
+        <button class="btn btn-primary" id="btnExportCSV">Exportar Relatório (CSV)</button>
+      </div>
+    </div>
+
+    <div id="recordsContainer"></div>
+  </div>
+
+</div>
+
+<!-- MODAL LOGIN -->
+<div class="modal-overlay" id="loginModal">
+  <div class="modal">
+    <h2>Acesso ADM</h2>
+    <div class="form-group">
+      <label for="loginUser">Usuário</label>
+      <input type="text" id="loginUser">
+    </div>
+    <div class="form-group">
+      <label for="loginPass">Senha</label>
+      <input type="password" id="loginPass">
+    </div>
+    <div class="actions">
+      <button class="btn btn-reset" id="btnCancelLogin">Cancelar</button>
+      <button class="btn btn-primary" id="btnLogin">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ADM -->
+<div class="modal-overlay" id="admModal">
+  <div class="modal">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2>Painel do Administrador</h2>
+      <button class="btn-sm-danger" id="btnCloseAdm" style="font-size: 1.2rem;">✕</button>
+    </div>
+
+    <div class="admin-section">
+      <h3>Cadastrar Novo ADM</h3>
+      <div class="form-group" style="margin-bottom:6px;">
+        <input type="text" id="newAdmUser" placeholder="Usuário">
+      </div>
+      <div class="inline-form">
+        <input type="password" id="newAdmPass" placeholder="Senha">
+        <button class="btn btn-primary" id="btnAddAdm">Add</button>
+      </div>
+      <div id="admUsersList" style="margin-top: 8px;"></div>
+    </div>
+
+    <div class="admin-section">
+      <h3>Gerenciar Coletores</h3>
+      <div class="inline-form">
+        <input type="text" id="newColetorInput" placeholder="Ex: COL-06">
+        <button class="btn btn-primary" id="btnAddColetor">Add</button>
+      </div>
+      <div id="admColetoresList" style="margin-top: 8px;"></div>
+    </div>
+
+    <div class="admin-section">
+      <h3>Gerenciar Itens do Checklist</h3>
+      <div class="inline-form">
+        <input type="text" id="newItemInput" placeholder="Ex: Teste de Conexão">
+        <button class="btn btn-primary" id="btnAddItem">Add</button>
+      </div>
+      <div id="admItemsList" style="margin-top: 8px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- INICIALIZAÇÃO FIREBASE -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBM_WqhDckDzgtxPl1qi7oKU8QiMqHbJIQ",
+    authDomain: "dashboard-revers.firebaseapp.com",
+    databaseURL: "https://dashboard-revers-default-rtdb.firebaseio.com",
+    projectId: "dashboard-revers",
+    storageBucket: "dashboard-revers.firebasestorage.app",
+    messagingSenderId: "121809447249",
+    appId: "1:121809447249:web:253b34182189a3053d0b70",
+    measurementId: "G-6MZ4P5KJ65"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+</script>
+
+<!-- LÓGICA DA APLICAÇÃO -->
+<script>
+  const defaultColetores = ["COL-01", "COL-02", "COL-03", "COL-04", "COL-05"];
+  const defaultItems = [
+    "Bateria 100% carregada",
+    "Tela intacta e sem trincas",
+    "Gatilho / Botões funcionando",
+    "Leitor de código de barras testado",
+    "Conexão Wi-Fi operacional",
+    "Alça de mão / Acessórios fixados"
+  ];
+  const defaultAdms = [{ user: "Giovanni", pass: "240223" }];
+
+  const defaultRegistros = [
+    {
+      id: 1,
+      dataISO: "2026-08-26",
+      dataBR: "26/08/2026",
+      hora: "08:30",
+      coletor: "COL-01",
+      responsavel: "ALISSON",
+      completo: true,
+      devolvido: true,
+      horaDevolucao: "17:15",
+      obsDevolucao: "Devolvido em perfeito estado.",
+      statusDevolucao: "OK",
+      itens: defaultItems.map(item => ({ item, status: true }))
+    },
+    {
+      id: 2,
+      dataISO: "2026-08-26",
+      dataBR: "26/08/2026",
+      hora: "09:15",
+      coletor: "COL-03",
+      responsavel: "MARCOS",
+      completo: true,
+      devolvido: false,
+      horaDevolucao: null,
+      obsDevolucao: null,
+      statusDevolucao: null,
+      itens: defaultItems.map(item => ({ item, status: true }))
+    }
+  ];
+
+  let coletores = JSON.parse(localStorage.getItem('adm_coletores')) || defaultColetores;
+  let itemsChecklist = JSON.parse(localStorage.getItem('adm_items')) || defaultItems;
+  let adms = JSON.parse(localStorage.getItem('adm_users')) || defaultAdms;
+  let registros = JSON.parse(localStorage.getItem('adm_registros')) || defaultRegistros;
+
+  const coletorSelect = document.getElementById('coletorSelect');
+  const responsavelInput = document.getElementById('responsavelInput');
+  const checklistContainer = document.getElementById('checklistContainer');
+  const progressBar = document.getElementById('progressBar');
+  const filterDateInput = document.getElementById('filterDate');
+
+  function switchTab(tabId) {
+    document.getElementById('tabChecklist').classList.remove('active');
+    document.getElementById('tabRegistros').classList.remove('active');
+    document.getElementById('btnTabChecklist').classList.remove('active');
+    document.getElementById('btnTabRegistros').classList.remove('active');
+
+    if (tabId === 'tabChecklist') {
+      document.getElementById('tabChecklist').classList.add('active');
+      document.getElementById('btnTabChecklist').classList.add('active');
+    } else {
+      document.getElementById('tabRegistros').classList.add('active');
+      document.getElementById('btnTabRegistros').classList.add('active');
+      renderRegistros();
+    }
+  }
+
+  function renderApp() {
+    const currentSelected = coletorSelect.value;
+    coletorSelect.innerHTML = '<option value="">Selecione o coletor...</option>';
+    coletores.forEach(col => {
+      const opt = document.createElement('option');
+      opt.value = col;
+      opt.textContent = col;
+      coletorSelect.appendChild(opt);
+    });
+    coletorSelect.value = currentSelected;
+
+    checklistContainer.innerHTML = '';
+    itemsChecklist.forEach((itemText, index) => {
+      const label = document.createElement('label');
+      label.className = 'check-item';
+      label.innerHTML = `
+        <input type="checkbox" class="chk-item" data-index="${index}">
+        <span>${itemText}</span>
+      `;
+      checklistContainer.appendChild(label);
+    });
+
+    document.querySelectorAll('.chk-item').forEach(chk => {
+      chk.addEventListener('change', updateProgress);
+    });
+
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const checkboxes = document.querySelectorAll('.chk-item');
+    const total = checkboxes.length;
+    const checkedCount = Array.from(checkboxes).filter(chk => chk.checked).length;
+    const percent = total > 0 ? Math.round((checkedCount / total) * 100) : 0;
+
+    progressBar.style.width = percent + '%';
+    progressBar.style.backgroundColor = percent === 100 ? 'var(--success)' : 'var(--primary)';
+  }
+
+  document.getElementById('btnSaveRecord').addEventListener('click', () => {
+    const coletor = coletorSelect.value;
+    const responsavel = responsavelInput.value.trim().toUpperCase();
+
+    if (!coletor || !responsavel) {
+      alert('Selecione o Coletor e informe o Responsável.');
+      return;
+    }
+
+    const checkboxes = document.querySelectorAll('.chk-item');
+    const itensDetalhes = [];
+    checkboxes.forEach((chk, i) => {
+      itensDetalhes.push({
+        item: itemsChecklist[i],
+        status: chk.checked
+      });
+    });
+
+    const agora = new Date();
+    const dataISO = agora.toISOString().split('T')[0];
+    const dataBR = agora.toLocaleDateString('pt-BR');
+    const hora = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    const novoRegistro = {
+      id: Date.now(),
+      dataISO: dataISO,
+      dataBR: dataBR,
+      hora: hora,
+      coletor: coletor,
+      responsavel: responsavel,
+      itens: itensDetalhes,
+      completo: itensDetalhes.every(i => i.status),
+      devolvido: false,
+      horaDevolucao: null,
+      obsDevolucao: null,
+      statusDevolucao: null
+    };
+
+    registros.unshift(novoRegistro);
+    localStorage.setItem('adm_registros', JSON.stringify(registros));
+
+    alert(`Retirada salva com sucesso!\n${dataBR} às ${hora} - ${coletor} com "${responsavel}"`);
+
+    coletorSelect.value = '';
+    responsavelInput.value = '';
+    checkboxes.forEach(chk => chk.checked = false);
+    updateProgress();
+  });
+
+  function renderRegistros() {
+    const container = document.getElementById('recordsContainer');
+    container.innerHTML = '';
+
+    const filterDate = filterDateInput.value;
+    let listaFiltrada = registros;
+
+    if (filterDate) {
+      listaFiltrada = registros.filter(r => r.dataISO === filterDate);
+    }
+
+    if (listaFiltrada.length === 0) {
+      container.innerHTML = '<div style="text-align:center; color: var(--text-muted); padding: 40px; background: #fff; border-radius: 8px;">Nenhum registro encontrado para esta data.</div>';
+      return;
+    }
+
+    const agrupados = {};
+    listaFiltrada.forEach(rec => {
+      if (!agrupados[rec.dataBR]) agrupados[rec.dataBR] = [];
+      agrupados[rec.dataBR].push(rec);
+    });
+
+    Object.keys(agrupados).forEach(data => {
+      const dayGroup = document.createElement('div');
+      dayGroup.className = 'record-day-group';
+      
+      let html = `<div class="day-title">Dia: ${data}</div><div class="records-grid">`;
+
+      agrupados[data].forEach(rec => {
+        let badge = '';
+        if (!rec.devolvido) {
+          badge = `<span class="badge-warn">EM USO</span>`;
+        } else if (rec.statusDevolucao === 'OK') {
+          badge = `<span class="badge-ok">DEVOLVIDO (OK)</span>`;
+        } else {
+          badge = `<span class="badge-danger">DEVOLVIDO (AVARIA)</span>`;
+        }
+
+        let itensHtml = '';
+        rec.itens.forEach(it => {
+          const st = it.status 
+            ? `<span style="color: var(--success); font-weight:bold;">OK</span>`
+            : `<span style="color: var(--danger); font-weight:bold;">PENDENTE</span>`;
+          itensHtml += `<li><span>${it.item}</span> ${st}</li>`;
+        });
+
+        let devSection = '';
+        if (rec.devolvido) {
+          devSection = `
+            <div class="dev-box">
+              <strong>Checkout de Devolução:</strong><br>
+              Horário: ${rec.horaDevolucao}<br>
+              Status: ${rec.statusDevolucao === 'OK' ? 'Nas mesmas condições' : 'Com observações/avaria'}<br>
+              ${rec.obsDevolucao ? `Obs: ${rec.obsDevolucao}` : ''}
+            </div>
+          `;
+        } else {
+          devSection = `
+            <div style="margin-top: 12px; text-align: center;">
+              <button class="btn btn-success" style="width: 100%;" onclick="event.stopPropagation(); registrarDevolucao(${rec.id})">Confirmar Devolução</button>
+            </div>
+          `;
+        }
+
+        html += `
+          <div class="record-card" onclick="toggleRecordCard(this)">
+            <div class="record-header">
+              <span>${rec.coletor} - ${rec.responsavel}</span>
+              ${badge}
+            </div>
+            <div style="font-size:0.8rem; color: var(--text-muted);">Retirada: ${rec.hora} - (Clique para detalhes)</div>
+            <div class="record-body">
+              <div style="font-size:0.85rem; font-weight:bold; margin-bottom:6px;">Checklist na Retirada:</div>
+              <ul class="item-status-list">
+                ${itensHtml}
+              </ul>
+              ${devSection}
+              <div style="text-align:right; margin-top: 12px;">
+                <button class="btn-sm-danger" onclick="event.stopPropagation(); removeRecord(${rec.id})">Excluir Registro</button>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+      dayGroup.innerHTML = html;
+      container.appendChild(dayGroup);
+    });
+  }
+
+  window.registrarDevolucao = function(id) {
+    const rec = registros.find(r => r.id === id);
+    if (!rec) return;
+
+    const mesmoEstado = confirm(`Confirmar devolução do ${rec.coletor} (${rec.responsavel})?\n\nClique em OK se voltou NAS MESMAS CONDIÇÕES do checklist inicial.\nClique em CANCELAR se houve alguma avaria/problema.`);
+
+    const agora = new Date();
+    const horaDev = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    rec.devolvido = true;
+    rec.horaDevolucao = horaDev;
+
+    if (mesmoEstado) {
+      rec.statusDevolucao = 'OK';
+      rec.obsDevolucao = 'Entregue nas mesmas condições.';
+    } else {
+      rec.statusDevolucao = 'AVARIA';
+      rec.obsDevolucao = prompt('Descreva o estado/problema na devolução:', 'Ex: Tela trincada / Bateria fraca');
+    }
+
+    localStorage.setItem('adm_registros', JSON.stringify(registros));
+    renderRegistros();
+  };
+
+  window.toggleRecordCard = function(card) {
+    card.classList.toggle('expanded');
+  };
+
+  function clearDateFilter() {
+    filterDateInput.value = '';
+    renderRegistros();
+  }
+
+  filterDateInput.addEventListener('change', renderRegistros);
+  document.getElementById('btnClearFilter').addEventListener('click', clearDateFilter);
+
+  window.removeRecord = function(id) {
+    if (confirm('Deseja excluir este registro?')) {
+      registros = registros.filter(r => r.id !== id);
+      localStorage.setItem('adm_registros', JSON.stringify(registros));
+      renderRegistros();
+    }
+  };
+
+  document.getElementById('btnExportCSV').addEventListener('click', () => {
+    if (registros.length === 0) {
+      alert('Não há registros para exportar.');
+      return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,Data,Hora Retirada,Coletor,Responsavel,Status Devolucao,Hora Devolucao,Observacao\n";
+    registros.forEach(r => {
+      const stDev = r.devolvido ? (r.statusDevolucao === 'OK' ? 'Devolvido OK' : 'Devolvido com Avaria') : 'Em Uso';
+      const hDev = r.horaDevolucao || '-';
+      const obs = r.obsDevolucao ? r.obsDevolucao.replace(/,/g, ' ') : '-';
+      csvContent += `${r.dataBR},${r.hora},${r.coletor},${r.responsavel},${stDev},${hDev},${obs}\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `registros_coletores.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+
+  // Listeners das Abas
+  document.getElementById('btnTabChecklist').addEventListener('click', () => switchTab('tabChecklist'));
+  document.getElementById('btnTabRegistros').addEventListener('click', () => switchTab('tabRegistros'));
+
+  // Modais ADM
+  document.getElementById('openLoginBtn').addEventListener('click', () => {
+    document.getElementById('loginModal').classList.add('active');
+  });
+
+  document.getElementById('btnCancelLogin').addEventListener('click', () => closeModal('loginModal'));
+  document.getElementById('btnCloseAdm').addEventListener('click', () => closeModal('admModal'));
+
+  document.getElementById('btnLogin').addEventListener('click', () => {
+    const user = document.getElementById('loginUser').value;
+    const pass = document.getElementById('loginPass').value;
+    const found = adms.find(a => a.user === user && a.pass === pass);
+    
+    if (found) {
+      closeModal('loginModal');
+      document.getElementById('loginUser').value = '';
+      document.getElementById('loginPass').value = '';
+      openAdmPanel();
+    } else {
+      alert('Usuário ou senha incorretos!');
+    }
+  });
+
+  function openAdmPanel() {
+    renderAdmLists();
+    document.getElementById('admModal').classList.add('active');
+  }
+
+  function renderAdmLists() {
+    const admUsersList = document.getElementById('admUsersList');
+    admUsersList.innerHTML = '';
+    adms.forEach((adm, idx) => {
+      admUsersList.innerHTML += `
+        <div class="admin-list-item">
+          <span>${adm.user}</span>
+          ${adms.length > 1 ? `<button class="btn-sm-danger" onclick="removeAdm(${idx})">Excluir</button>` : ''}
+        </div>`;
+    });
+
+    const admColetoresList = document.getElementById('admColetoresList');
+    admColetoresList.innerHTML = '';
+    coletores.forEach((col, idx) => {
+      admColetoresList.innerHTML += `
+        <div class="admin-list-item">
+          <span>${col}</span>
+          <button class="btn-sm-danger" onclick="removeColetor(${idx})">Excluir</button>
+        </div>`;
+    });
+
+    const admItemsList = document.getElementById('admItemsList');
+    admItemsList.innerHTML = '';
+    itemsChecklist.forEach((item, idx) => {
+      admItemsList.innerHTML += `
+        <div class="admin-list-item">
+          <span>${item}</span>
+          <button class="btn-sm-danger" onclick="removeItem(${idx})">Excluir</button>
+        </div>`;
+    });
+  }
+
+  document.getElementById('btnAddAdm').addEventListener('click', () => {
+    const u = document.getElementById('newAdmUser').value.trim();
+    const p = document.getElementById('newAdmPass').value.trim();
+    if (u && p) {
+      adms.push({ user: u, pass: p });
+      localStorage.setItem('adm_users', JSON.stringify(adms));
+      document.getElementById('newAdmUser').value = '';
+      document.getElementById('newAdmPass').value = '';
+      renderAdmLists();
+    }
+  });
+
+  document.getElementById('btnAddColetor').addEventListener('click', () => {
+    const val = document.getElementById('newColetorInput').value.trim();
+    if (val) {
+      coletores.push(val);
+      localStorage.setItem('adm_coletores', JSON.stringify(coletores));
+      document.getElementById('newColetorInput').value = '';
+      renderAdmLists();
+      renderApp();
+    }
+  });
+
+  document.getElementById('btnAddItem').addEventListener('click', () => {
+    const val = document.getElementById('newItemInput').value.trim();
+    if (val) {
+      itemsChecklist.push(val);
+      localStorage.setItem('adm_items', JSON.stringify(itemsChecklist));
+      document.getElementById('newItemInput').value = '';
+      renderAdmLists();
+      renderApp();
+    }
+  });
+
+  window.removeAdm = function(i) { adms.splice(i, 1); localStorage.setItem('adm_users', JSON.stringify(adms)); renderAdmLists(); };
+  window.removeColetor = function(i) { coletores.splice(i, 1); localStorage.setItem('adm_coletores', JSON.stringify(coletores)); renderAdmLists(); renderApp(); };
+  window.removeItem = function(i) { itemsChecklist.splice(i, 1); localStorage.setItem('adm_items', JSON.stringify(itemsChecklist)); renderAdmLists(); renderApp(); };
+
+  function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+  document.getElementById('btnReset').addEventListener('click', () => {
+    coletorSelect.value = '';
+    responsavelInput.value = '';
+    document.querySelectorAll('.chk-item').forEach(chk => chk.checked = false);
+    updateProgress();
+  });
+
+  renderApp();
+  renderRegistros();
+</script>
+
+</body>
+</html>
